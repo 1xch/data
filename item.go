@@ -117,3 +117,14 @@ func (i *Item) SetMap(m map[string]string) {
 	}
 	i.Value = strings.Join(set, ",")
 }
+
+func (i *Item) Clone(k string) *Item {
+	var key, value string
+	if k != "" {
+		key = k
+	} else {
+		key = i.Key
+	}
+	value = i.Value
+	return NewItem(key, value)
+}

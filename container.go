@@ -37,7 +37,7 @@ func (c *Container) Get(k string) *Item {
 
 func (c *Container) Clone(except ...string) *Container {
 	n := NewContainer(c.Tagged())
-	l := c.List()
+	l := c.List(except...)
 	n.SetItem(l...)
 	return n
 }
