@@ -26,9 +26,8 @@ _testmain.go
 Godeps/*
 !Godeps/Godeps.json
 
-warhola
+data
 _back
 *.out
 *.old.*
 coverage.html
-fonts

@@ -9,13 +9,13 @@ type drror struct {
 	vals []interface{}
 }
 
-func (x *drror) Error() string {
-	return fmt.Sprintf("%s", fmt.Sprintf(x.base, x.vals...))
+func (d *drror) Error() string {
+	return fmt.Sprintf("%s", fmt.Sprintf(d.base, d.vals...))
 }
 
-func (x *drror) Out(vals ...interface{}) *drror {
-	x.vals = vals
-	return x
+func (d *drror) Out(vals ...interface{}) *drror {
+	d.vals = vals
+	return d
 }
 
 func Drror(base string) *drror {

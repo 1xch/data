@@ -14,6 +14,16 @@ func NewContainer(tag string) *Container {
 	}
 }
 
+func Merge(cs ...*Container) *Container {
+	tag := cs[0].Tagged()
+	ret := NewContainer(tag)
+	for _, c := range cs {
+		l := c.List()
+		ret.SetItem(l...)
+	}
+	return ret
+}
+
 func (c *Container) Tagged() string {
 	return c.Tag
 }

@@ -315,6 +315,21 @@ func (t *Trie) List() []*Item {
 	return ret
 }
 
+func (t *Trie) TemplateData() map[string]interface{} {
+	ret := make(map[string]interface{})
+	l := t.List()
+	for _, v := range l {
+		k := strings.Split(v.Key, ".")
+		var j []string
+		for _, kv := range k {
+			j = append(j, strings.Title(kv))
+		}
+		tk := strings.Join(j, "")
+		ret[tk] = v.Value
+	}
+	return ret
+}
+
 func (t *Trie) MarshalJSON() ([]byte, error) {
 	l := t.List()
 	return json.Marshal(&l)

@@ -12,7 +12,13 @@ type Item struct {
 
 type StringItem interface {
 	ToString() string
+	ToKVString() string
 	SetString(string)
+}
+
+type ByteItem interface {
+	ToByte() []byte
+	SetByte([]byte)
 }
 
 type BoolItem interface {
@@ -42,6 +48,10 @@ type MapItem interface {
 
 func NewItem(k, v string) *Item {
 	return &Item{k, v}
+}
+
+func (i *Item) ToKVString() string {
+	return fmt.Sprintf("%s:%s", i.Key, i.Value)
 }
 
 func (i *Item) ToString() string {
