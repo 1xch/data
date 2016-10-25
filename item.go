@@ -1,25 +1,38 @@
 package data
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
-type Item struct {
-	Key, Value string
+type Keyer interface {
+	Key() string
+	Undotted() string
+	Change(string)
+}
+
+type Valuer interface {
+	StringItem
+	BoolItem
+	IntItem
+	FloatItem
+	ListItem
+	MapItem
 }
 
 type StringItem interface {
 	ToString() string
-	ToKVString() string
 	SetString(string)
 }
 
-type ByteItem interface {
-	ToByte() []byte
-	SetByte([]byte)
-}
+//type ByteItem interface {
+//	ToByte() []byte
+//	SetByte([]byte)
+//}
 
 type BoolItem interface {
 	ToBool() bool
@@ -46,67 +59,121 @@ type MapItem interface {
 	SetMap(map[string]string)
 }
 
-func NewItem(k, v string) *Item {
-	return &Item{k, v}
+type KVer interface {
+	ToKVString() string
+	ToKV() (string, interface{})
 }
 
-func (i *Item) ToKVString() string {
-	return fmt.Sprintf("%s:%s", i.Key, i.Value)
+type Transmitter interface {
+	BasicItem() *BasicItem
+	JsonTransmitter
+	YamlTransmitter
 }
 
-func (i *Item) ToString() string {
+type JsonTransmitter interface {
+	json.Marshaler
+	json.Unmarshaler
+}
+
+type YamlTransmitter interface {
+	yaml.Marshaler
+	yaml.Unmarshaler
+}
+
+type Item interface {
+	Keyer
+	Valuer
+	KVer
+	Transmitter
+	Clone(string) Item
+}
+
+type item struct {
+	key, Value string
+}
+
+func NewItem(k, v string) Item {
+	return &item{k, v}
+}
+
+func (i *item) Key() string {
+	return i.key
+}
+
+func (i *item) Undotted() string {
+	k := strings.Split(i.key, ".")
+	var j []string
+	for _, kv := range k {
+		j = append(j, strings.Title(kv))
+	}
+	return strings.Join(j, "")
+}
+
+func (i *item) Change(to string) {
+	i.key = to
+}
+
+func (i *item) ToKVString() string {
+	return fmt.Sprintf("%s:%s", i.key, i.Value)
+}
+
+func (i *item) ToKV() (string, interface{}) {
+	return i.key, i.Value
+}
+
+func (i *item) ToString() string {
 	return i.Value
 }
 
-func (i *Item) SetString(s string) {
+func (i *item) SetString(s string) {
 	i.Value = s
 }
 
-func (i *Item) ToBool() bool {
+func (i *item) ToBool() bool {
 	if vl, err := strconv.ParseBool(i.Value); err == nil {
 		return vl
 	}
 	return false
 }
 
-func (i *Item) SetBool(b bool) {
+func (i *item) SetBool(b bool) {
 	i.Value = strconv.FormatBool(b)
 }
 
-func (i *Item) ToInt() int {
+func (i *item) ToInt() int {
 	if vl, err := strconv.Atoi(i.Value); err == nil {
 		return vl
 	}
 	return 0
 }
 
-func (i *Item) SetInt(in int) {
+func (i *item) SetInt(in int) {
 	i.Value = strconv.Itoa(in)
 }
 
-func (i *Item) ToFloat() float64 {
+func (i *item) ToFloat() float64 {
 	if vl, err := strconv.ParseFloat(i.Value, 64); err == nil {
 		return vl
 	}
 	return 0.0
 }
 
-func (i *Item) SetFloat(in float64) {
+func (i *item) SetFloat(in float64) {
 	i.Value = strconv.FormatFloat(in, 'f', 1, 64)
 }
 
-func (i *Item) ToList() []string {
+func (i *item) ToList() []string {
 	vl := i.Value
 	spl := strings.Split(vl, ",")
 	return spl
 }
 
-func (i *Item) SetList(l ...string) {
+func (i *item) SetList(l ...string) {
 	list := strings.Join(l, ",")
 	i.Value = list
 }
 
-func (i *Item) ToMap() map[string]string {
+func (i *item) ToMap() map[string]string {
 	ret := make(map[string]string)
 	list := i.ToList()
 	for _, v := range list {
@@ -120,7 +187,7 @@ func (i *Item) ToMap() map[string]string {
 	return ret
 }
 
-func (i *Item) SetMap(m map[string]string) {
+func (i *item) SetMap(m map[string]string) {
 	var set []string
 	for k, v := range m {
 		set = append(set, fmt.Sprintf("%s:%s", k, v))
@@ -128,12 +195,50 @@ func (i *Item) SetMap(m map[string]string) {
 	i.Value = strings.Join(set, ",")
 }
 
-func (i *Item) Clone(k string) *Item {
+type BasicItem struct {
+	Key, Value string
+}
+
+func (i *item) BasicItem() *BasicItem {
+	return &BasicItem{i.key, i.Value}
+}
+
+func (i *item) MarshalJSON() ([]byte, error) {
+	return json.Marshal(i.BasicItem())
+}
+
+func (i *item) UnmarshalJSON(b []byte) error {
+	var bi *BasicItem
+	err := json.Unmarshal(b, &bi)
+	if err != nil {
+		return err
+	}
+	i.key = bi.Key
+	i.Value = bi.Value
+	return nil
+}
+
+func (i *item) MarshalYAML() (interface{}, error) {
+	return i.BasicItem(), nil
+}
+
+func (i *item) UnmarshalYAML(u func(interface{}) error) error {
+	var bi *BasicItem
+	err := u(&bi)
+	if err != nil {
+		return err
+	}
+	i.key = bi.Key
+	i.Value = bi.Value
+	return nil
+}
+
+func (i *item) Clone(k string) Item {
 	var key, value string
 	if k != "" {
 		key = k
 	} else {
-		key = i.Key
+		key = i.Key()
 	}
 	value = i.Value
 	return NewItem(key, value)

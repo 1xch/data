@@ -1,7 +1,6 @@
 package data
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -10,14 +9,15 @@ import (
 
 type Prefix []byte
 
-type VisitorFunc func(Prefix, *Item) error
+type VisitorFunc func(Prefix, Item) error
 
+// a trie mostly constructed from https://github.com/tchap/go-patricia
 type Trie struct {
 	prefix                   Prefix
 	maxPrefixPerNode         int
 	maxChildrenPerSparseNode int
 	children                 childList
-	item                     *Item
+	item                     Item
 }
 
 const (
@@ -67,21 +67,21 @@ func (t *Trie) Tagged() string {
 	return string(t.prefix)
 }
 
-func (t *Trie) Item() *Item {
+func (t *Trie) Item() Item {
 	return t.item
 }
 
-func (t *Trie) Insert(i *Item) bool {
-	return t.put(i, false)
-}
+//func (t *Trie) insert(i Item) bool {
+//	return t.put(i, false)
+//}
 
-func (t *Trie) Set(items ...*Item) {
+func (t *Trie) set(items ...Item) {
 	for _, i := range items {
 		t.put(i, true)
 	}
 }
 
-func (t *Trie) Get(p Prefix) *Item {
+func (t *Trie) get(p Prefix) Item {
 	if p != nil {
 		_, node, found, leftover := t.findSubtree(p)
 		if !found || len(leftover) != 0 {
@@ -94,17 +94,8 @@ func (t *Trie) Get(p Prefix) *Item {
 
 var NoItemError = Drror("No item with the prefix %s available.").Out
 
-func (t *Trie) Find(k string) (*Item, error) {
-	key := Prefix(k)
-	i := t.Get(key)
-	if i == nil {
-		return nil, NoItemError(k)
-	}
-	return i, nil
-}
-
 func (t *Trie) Match(p Prefix) bool {
-	return t.Get(p) != nil
+	return t.get(p) != nil
 }
 
 func (t *Trie) MatchSubtree(p Prefix) bool {
@@ -305,60 +296,6 @@ func (t *Trie) DeleteSubtree(p Prefix) bool {
 	return true
 }
 
-func (t *Trie) List() []*Item {
-	var ret []*Item
-	v := func(p Prefix, i *Item) error {
-		ret = append(ret, i)
-		return nil
-	}
-	t.walk(nil, v)
-	return ret
-}
-
-func (t *Trie) TemplateData() map[string]interface{} {
-	ret := make(map[string]interface{})
-	l := t.List()
-	for _, v := range l {
-		k := strings.Split(v.Key, ".")
-		var j []string
-		for _, kv := range k {
-			j = append(j, strings.Title(kv))
-		}
-		tk := strings.Join(j, "")
-		ret[tk] = v.Value
-	}
-	return ret
-}
-
-func (t *Trie) MarshalJSON() ([]byte, error) {
-	l := t.List()
-	return json.Marshal(&l)
-}
-
-func (t *Trie) UnmarshalJSON(b []byte) error {
-	var i []*Item
-	err := json.Unmarshal(b, &i)
-	if err != nil {
-		return err
-	}
-	t.Set(i...)
-	return nil
-}
-
-func (t *Trie) MarshalYAML() (interface{}, error) {
-	return t.List(), nil
-}
-
-func (t *Trie) UnmarshalYAML(u func(interface{}) error) error {
-	var i []*Item
-	err := u(&i)
-	if err != nil {
-		return err
-	}
-	t.Set(i...)
-	return nil
-}
-
 func (t *Trie) empty() bool {
 	return t.item == nil && t.children.length() == 0
 }
@@ -366,7 +303,7 @@ func (t *Trie) empty() bool {
 func (t *Trie) size() int {
 	n := 0
 
-	t.walk(nil, func(prefix Prefix, item *Item) error {
+	t.walk(nil, func(prefix Prefix, item Item) error {
 		n++
 		return nil
 	})
@@ -385,8 +322,8 @@ func (t *Trie) reset() {
 
 var ErrNilPrefix = Drror("Nil prefix passed into a method call")
 
-func (t *Trie) put(item *Item, replace bool) bool {
-	key := Prefix(item.Key)
+func (t *Trie) put(item Item, replace bool) bool {
+	key := Prefix(item.Key())
 	// Nil prefix not allowed.
 	if key == nil {
 		panic(ErrNilPrefix)
