@@ -13,80 +13,74 @@ import (
 )
 
 type Store interface {
-	Out() error
-	Write([]byte) (int, error)
-	In() (*Container, error)
 	Read([]byte) (int, error)
+	In() (*Container, error)
 	Swap(*Container)
+	Out() (*Container, error)
+	Write([]byte) (int, error)
 }
+
+type ReadFunc func(*Retriever) (io.ReadCloser, int64, error)
+
+type InFunc func(string, int64, io.ReadCloser) (*Container, error)
+
+type OutFunc func(*Container, io.WriteCloser) ([]string, error)
+
+type WriteFunc func(*Container) (io.WriteCloser, error)
 
 type store struct {
-	*retriever
+	*Retriever
 	c   *Container
-	ofn outFunc
-	wfn writeFunc
-	ifn inFunc
-	rfn readFunc
+	rfn ReadFunc
+	ifn InFunc
+	ofn OutFunc
+	wfn WriteFunc
 }
 
-type outFunc func(*Container, io.WriteCloser) ([]string, error)
+func NewStore(rfn ReadFunc, ifn InFunc, ofn OutFunc, wfn WriteFunc, rs ...string) Store {
+	return &store{
+		Retriever: NewRetriever(rs...),
+		rfn:       rfn,
+		ifn:       ifn,
+		ofn:       ofn,
+		wfn:       wfn,
+	}
+}
 
-type writeFunc func(*Container) (io.WriteCloser, error)
-
-type inFunc func(string, int64, io.ReadCloser) (*Container, error)
-
-type readFunc func(*retriever) (io.ReadCloser, int64, error)
-
-type retriever struct {
+type Retriever struct {
 	v []string
 }
 
-func newRetriever(with ...string) *retriever {
-	return &retriever{with}
+func NewRetriever(with ...string) *Retriever {
+	return &Retriever{with}
 }
 
-func (r *retriever) SetString(s []string) {
+func (r *Retriever) SetRetrieval(s []string) {
 	r.v = s
 }
 
-func (r *retriever) Retrieval() []string {
+func (r *Retriever) Retrieval() []string {
 	return r.v
 }
 
-func (r *retriever) RetrievalString() string {
+func (r *Retriever) RetrievalString() string {
 	return strings.Join(r.v, ":")
 }
 
 var MalformedRetrievalStringError = Drror("%s is malformed: %s").Out
 
-func (s *store) Swap(c *Container) {
-	s.c = c
-	s.retriever.SetString(c.ToList("store.retrival.string"))
-}
-
-func (s *store) Out() error {
-	w, err := s.wfn(s.c)
-	if err != nil {
-		return err
-	}
-	r, err := s.ofn(s.c, w)
-	if err != nil {
-		return err
-	}
-	s.SetString(r)
-	return nil
-}
-
-func (s *store) Write(p []byte) (int, error) {
-	w, err := s.wfn(s.c)
+func (s *store) Read(p []byte) (int, error) {
+	r, _, err := s.rfn(s.Retriever)
 	if err != nil {
 		return 0, err
 	}
-	return w.Write(p)
+	i, err := r.Read(p)
+	r.Close()
+	return i, err
 }
 
 func (s *store) In() (*Container, error) {
-	r, n, err := s.rfn(s.retriever)
+	r, n, err := s.rfn(s.Retriever)
 	if err != nil {
 		return nil, err
 	}
@@ -98,14 +92,30 @@ func (s *store) In() (*Container, error) {
 	return c, nil
 }
 
-func (s *store) Read(p []byte) (int, error) {
-	r, _, err := s.rfn(s.retriever)
+func (s *store) Swap(c *Container) {
+	s.c = c
+	s.SetRetrieval(c.ToList("store.retrival.string"))
+}
+
+func (s *store) Out() (*Container, error) {
+	w, err := s.wfn(s.c)
+	if err != nil {
+		return nil, err
+	}
+	r, err := s.ofn(s.c, w)
+	if err != nil {
+		return nil, err
+	}
+	s.SetRetrieval(r)
+	return s.c, nil
+}
+
+func (s *store) Write(p []byte) (int, error) {
+	w, err := s.wfn(s.c)
 	if err != nil {
 		return 0, err
 	}
-	i, err := r.Read(p)
-	r.Close()
-	return i, err
+	return w.Write(p)
 }
 
 type StoreMaker struct {
@@ -151,8 +161,14 @@ var StdoutStore = &StoreMaker{"STDOUT", stdoutStore}
 
 func stdoutStore([]string) Store {
 	rs := []string{"default", "STDOUT"}
-	return &store{
-		ofn: func(c *Container, w io.WriteCloser) ([]string, error) {
+	return NewStore(
+		func(rt *Retriever) (io.ReadCloser, int64, error) {
+			return nil, 0, FunctionNotImplemented("Read Function", "STDOUT")
+		},
+		func(r string, n int64, rr io.ReadCloser) (*Container, error) {
+			return nil, FunctionNotImplemented("In Function", "STDOUT")
+		},
+		func(c *Container, w io.WriteCloser) ([]string, error) {
 			b, err := c.MarshalJSON()
 			if err != nil {
 				return nil, err
@@ -161,35 +177,19 @@ func stdoutStore([]string) Store {
 			w.Close()
 			return rs, err
 		},
-		wfn: func(c *Container) (io.WriteCloser, error) {
+		func(c *Container) (io.WriteCloser, error) {
 			return os.Stdout, nil
 		},
-		ifn: func(r string, n int64, rr io.ReadCloser) (*Container, error) {
-			return nil, FunctionNotImplemented("In Function", "STDOUT")
-		},
-		rfn: func(rt *retriever) (io.ReadCloser, int64, error) {
-			return nil, 0, FunctionNotImplemented("Read Function", "STDOUT")
-		},
-		retriever: newRetriever(rs...),
-	}
+		rs...,
+	)
 }
 
 var YamlStore = &StoreMaker{"yaml", yamlStore}
 
 func yamlStore(rs []string) Store {
-	return &store{
-		ofn: func(c *Container, w io.WriteCloser) ([]string, error) {
-			retrieval := c.ToList("store.retrieval.string")
-			y, err := yaml.Marshal(&c)
-			if err != nil {
-				return nil, err
-			}
-			_, err = w.Write(y)
-			w.Close()
-			return retrieval, err
-		},
-		wfn: fileFromContainer,
-		ifn: func(r string, n int64, rr io.ReadCloser) (*Container, error) {
+	return NewStore(
+		readCloserFrom("yaml"),
+		func(r string, n int64, rr io.ReadCloser) (*Container, error) {
 			c := New("")
 			b := make([]byte, n)
 			_, err := rr.Read(b)
@@ -202,9 +202,19 @@ func yamlStore(rs []string) Store {
 			}
 			return c, nil
 		},
-		rfn:       readCloserFromRetriever,
-		retriever: newRetriever(rs...),
-	}
+		func(c *Container, w io.WriteCloser) ([]string, error) {
+			retrieval := c.ToList("store.retrieval.string")
+			y, err := yaml.Marshal(&c)
+			if err != nil {
+				return nil, err
+			}
+			_, err = w.Write(y)
+			w.Close()
+			return retrieval, err
+		},
+		writeCloserFrom("yaml"),
+		rs...,
+	)
 }
 
 var (
@@ -224,19 +234,9 @@ func indented(c *Container) ([]byte, error) {
 
 func JsonStorer(jm jsonMarshaler) StoreFn {
 	return func(rs []string) Store {
-		return &store{
-			ofn: func(c *Container, w io.WriteCloser) ([]string, error) {
-				retrieval := c.ToList("store.retrieval.string")
-				j, err := jm(c)
-				if err != nil {
-					return nil, err
-				}
-				_, err = w.Write(j)
-				w.Close()
-				return retrieval, err
-			},
-			wfn: fileFromContainer,
-			ifn: func(r string, n int64, rr io.ReadCloser) (*Container, error) {
+		return NewStore(
+			readCloserFrom("json"),
+			func(r string, n int64, rr io.ReadCloser) (*Container, error) {
 				c := New("")
 				b := make([]byte, n)
 				_, err := rr.Read(b)
@@ -249,9 +249,19 @@ func JsonStorer(jm jsonMarshaler) StoreFn {
 				}
 				return c, nil
 			},
-			rfn:       readCloserFromRetriever,
-			retriever: newRetriever(rs...),
-		}
+			func(c *Container, w io.WriteCloser) ([]string, error) {
+				retrieval := c.ToList("store.retrieval.string")
+				j, err := jm(c)
+				if err != nil {
+					return nil, err
+				}
+				_, err = w.Write(j)
+				w.Close()
+				return retrieval, err
+			},
+			writeCloserFrom("json"),
+			rs...,
+		)
 	}
 }
 
@@ -262,54 +272,58 @@ func insufficient(s []string, i int) error {
 	return nil
 }
 
-func fileFromContainer(c *Container) (io.WriteCloser, error) {
-	rs := c.ToList("store.retrieval.string")
-	if err := insufficient(rs, 3); err != nil {
-		return nil, err
+func writeCloserFrom(ext string) WriteFunc {
+	return func(c *Container) (io.WriteCloser, error) {
+		rs := c.ToList("store.retrieval.string")
+		if err := insufficient(rs, 3); err != nil {
+			return nil, err
+		}
+		loc, fil := rs[1], rs[2]
+		p := filepath.Join(loc, fmt.Sprintf("%s.%s", fil, ext))
+		fl, err := Open(p)
+		if err != nil {
+			return nil, err
+		}
+		fl.Truncate(0)
+		return fl, nil
 	}
-	ext, loc, fil := rs[0], rs[1], rs[2]
-	p := filepath.Join(loc, fmt.Sprintf("%s.%s", fil, ext))
-	fl, err := Open(p)
-	if err != nil {
-		return nil, err
-	}
-	fl.Truncate(0)
-	return fl, nil
 }
 
 var ReaderRetrievalError = Drror("unable to find readcloser: %s").Out
 
-func readCloserFromRetriever(rt *retriever) (io.ReadCloser, int64, error) {
-	rs := rt.Retrieval()
-	if err := insufficient(rs, 3); err != nil {
-		return nil, 0, err
-	}
-	ext, dir, file := rs[0], rs[1], rs[2]
-	fileName := strings.Join([]string{file, ext}, ".")
-	info, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, 0, err
-	}
-	for _, f := range info {
-		if !f.IsDir() {
-			fn := f.Name()
-			if fn == fileName {
-				p := filepath.Join(dir, fn)
-				fl, err := Open(p)
-				if err != nil {
-					return nil, 0, err
-				}
-				var n int64
-				if fi, err := fl.Stat(); err == nil {
-					if size := fi.Size(); size < 1e9 {
-						n = size
+func readCloserFrom(ext string) ReadFunc {
+	return func(rt *Retriever) (io.ReadCloser, int64, error) {
+		rs := rt.Retrieval()
+		if err := insufficient(rs, 3); err != nil {
+			return nil, 0, err
+		}
+		dir, file := rs[1], rs[2]
+		fileName := strings.Join([]string{file, ext}, ".")
+		info, err := ioutil.ReadDir(dir)
+		if err != nil {
+			return nil, 0, err
+		}
+		for _, f := range info {
+			if !f.IsDir() {
+				fn := f.Name()
+				if fn == fileName {
+					p := filepath.Join(dir, fn)
+					fl, err := Open(p)
+					if err != nil {
+						return nil, 0, err
 					}
+					var n int64
+					if fi, err := fl.Stat(); err == nil {
+						if size := fi.Size(); size < 1e9 {
+							n = size
+						}
+					}
+					return fl, n, nil
 				}
-				return fl, n, nil
 			}
 		}
+		return nil, 0, ReaderRetrievalError("no suitable path from %v", rs)
 	}
-	return nil, 0, ReaderRetrievalError("no suitable path from %v", rs)
 }
 
 var openError = Drror("unable to find or open file %s, provided %s").Out

@@ -10,7 +10,7 @@ import (
 var (
 	currentDir             string
 	jsonLoc, yamlLoc       string
-	jsonRS, yamlRS         string
+	rs                     string
 	si, bi, ii, fi, li, mi Item
 	testItems              []Item
 	base                   *Container
@@ -18,9 +18,8 @@ var (
 
 func init() {
 	currentDir, _ = os.Getwd()
-	jsonRS = strings.Join([]string{"json", currentDir, "container"}, ",")
+	rs = strings.Join([]string{"json", currentDir, "container"}, ",")
 	jsonLoc = filepath.Join(currentDir, fmt.Sprintf("%s.%s", "container", "json"))
-	yamlRS = strings.Join([]string{"yaml", currentDir, "container"}, ",")
 	yamlLoc = filepath.Join(currentDir, fmt.Sprintf("%s.%s", "container", "yaml"))
 	si = NewItem("a.string", "string")
 	bi = NewItem("a.bool", "true")
@@ -31,7 +30,7 @@ func init() {
 	always1 := NewItem("always.1", "the same")
 	always2 := NewItem("always.2", "the same")
 	testItems = []Item{
-		NewItem("store.retrieval.string", jsonRS),
+		NewItem("store.retrieval.string", rs),
 		si, bi, ii, fi, li, mi, always1, always2,
 	}
 	base = testContainer().Clone()
