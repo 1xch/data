@@ -94,7 +94,7 @@ func (s *store) In() (*Container, error) {
 
 func (s *store) Swap(c *Container) {
 	s.c = c
-	s.SetRetrieval(c.ToList("store.retrival.string"))
+	s.SetRetrieval(c.ToStrings("store.retrival.string"))
 }
 
 func (s *store) Out() (*Container, error) {
@@ -157,31 +157,33 @@ func init() {
 
 var FunctionNotImplemented = Drror("%s function not implemented for the %s store.").Out
 
-var StdoutStore = &StoreMaker{"STDOUT", stdoutStore}
+var StdoutStore = &StoreMaker{"STDOUT", OutStore(os.Stdout)}
 
-func stdoutStore([]string) Store {
-	rs := []string{"default", "STDOUT"}
-	return NewStore(
-		func(rt *Retriever) (io.ReadCloser, int64, error) {
-			return nil, 0, FunctionNotImplemented("Read Function", "STDOUT")
-		},
-		func(r string, n int64, rr io.ReadCloser) (*Container, error) {
-			return nil, FunctionNotImplemented("In Function", "STDOUT")
-		},
-		func(c *Container, w io.WriteCloser) ([]string, error) {
-			b, err := c.MarshalJSON()
-			if err != nil {
-				return nil, err
-			}
-			_, err = w.Write(b)
-			w.Close()
-			return rs, err
-		},
-		func(c *Container) (io.WriteCloser, error) {
-			return os.Stdout, nil
-		},
-		rs...,
-	)
+func OutStore(out *os.File) StoreFn {
+	return func([]string) Store {
+		rs := []string{"default", "STDOUT"}
+		return NewStore(
+			func(rt *Retriever) (io.ReadCloser, int64, error) {
+				return nil, 0, FunctionNotImplemented("Read Function", "STDOUT")
+			},
+			func(r string, n int64, rr io.ReadCloser) (*Container, error) {
+				return nil, FunctionNotImplemented("In Function", "STDOUT")
+			},
+			func(c *Container, w io.WriteCloser) ([]string, error) {
+				b, err := c.MarshalJSON()
+				if err != nil {
+					return nil, err
+				}
+				_, err = w.Write(b)
+				w.Close()
+				return rs, err
+			},
+			func(c *Container) (io.WriteCloser, error) {
+				return out, nil
+			},
+			rs...,
+		)
+	}
 }
 
 var YamlStore = &StoreMaker{"yaml", yamlStore}
@@ -203,7 +205,7 @@ func yamlStore(rs []string) Store {
 			return c, nil
 		},
 		func(c *Container, w io.WriteCloser) ([]string, error) {
-			retrieval := c.ToList("store.retrieval.string")
+			retrieval := c.ToStrings("store.retrieval.string")
 			y, err := yaml.Marshal(&c)
 			if err != nil {
 				return nil, err
@@ -250,7 +252,7 @@ func JsonStorer(jm jsonMarshaler) StoreFn {
 				return c, nil
 			},
 			func(c *Container, w io.WriteCloser) ([]string, error) {
-				retrieval := c.ToList("store.retrieval.string")
+				retrieval := c.ToStrings("store.retrieval.string")
 				j, err := jm(c)
 				if err != nil {
 					return nil, err
@@ -274,7 +276,7 @@ func insufficient(s []string, i int) error {
 
 func writeCloserFrom(ext string) WriteFunc {
 	return func(c *Container) (io.WriteCloser, error) {
-		rs := c.ToList("store.retrieval.string")
+		rs := c.ToStrings("store.retrieval.string")
 		if err := insufficient(rs, 3); err != nil {
 			return nil, err
 		}

@@ -35,7 +35,7 @@ func TestTrie_GetNonexistentPrefix(t *testing.T) {
 	}
 
 	for _, v := range d {
-		trie.set(NewItem(v.key, v.value))
+		trie.set(NewStringItem(v.key, v.value))
 	}
 
 	if item := trie.get(Prefix("baa")); item != nil {

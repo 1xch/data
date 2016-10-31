@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 var (
 	currentDir             string
 	jsonLoc, yamlLoc       string
-	rs                     string
+	rs                     []string
 	si, bi, ii, fi, li, mi Item
 	testItems              []Item
 	base                   *Container
@@ -18,20 +17,26 @@ var (
 
 func init() {
 	currentDir, _ = os.Getwd()
-	rs = strings.Join([]string{"json", currentDir, "container"}, ",")
+	rs = []string{"json", currentDir, "container"}
 	jsonLoc = filepath.Join(currentDir, fmt.Sprintf("%s.%s", "container", "json"))
 	yamlLoc = filepath.Join(currentDir, fmt.Sprintf("%s.%s", "container", "yaml"))
-	si = NewItem("a.string", "string")
-	bi = NewItem("a.bool", "true")
-	ii = NewItem("a.int", "9")
-	fi = NewItem("a.float", "9.9")
-	li = NewItem("a.list", "a,b,c,d,e,f,g")
-	mi = NewItem("a.map", "a:one,b:two,c:3,d:d")
-	always1 := NewItem("always.1", "the same")
-	always2 := NewItem("always.2", "the same")
+	si = NewStringItem("a.string", "string")
+	li = NewStringsItem("a.list", "a", "b", "c")
+	bi = NewBoolItem("a.bool", false)
+	ii = NewIntItem("a.int", 9)
+	fi = NewFloatItem("a.float", 9.9)
+	c := New("multi")
+	c.Set(
+		NewStringItem("multi.1", "ONE"),
+		NewStringItem("multi.2", "TWO"),
+	)
+	mi = NewMultiItem(c.Tag(), c)
+	always1 := NewStringItem("always.1", "the same")
+	always2 := NewStringItem("always.2", "")
+	always2.Provide("the same")
+	ri := NewStringsItem("store.retrieval.string", rs...)
 	testItems = []Item{
-		NewItem("store.retrieval.string", rs),
-		si, bi, ii, fi, li, mi, always1, always2,
+		ri, si, li, bi, ii, fi, mi, always1, always2,
 	}
 	base = testContainer().Clone()
 }

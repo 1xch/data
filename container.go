@@ -3,7 +3,6 @@ package data
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 )
 
 type Container struct {
@@ -14,8 +13,8 @@ func New(tag string, o ...Option) *Container {
 	t := NewTrie(o...)
 	if tag != "" {
 		t.set(
-			NewItem("container.tag", tag),
-			NewItem("container.id", V4Quick()),
+			NewStringItem("container.tag", tag),
+			NewStringItem("container.id", V4Quick()),
 		)
 	}
 	return &Container{
@@ -30,7 +29,7 @@ func (c *Container) Tag() string {
 func (c *Container) Retag(t string) {
 	i := c.Get("container.tag")
 	if i != nil {
-		i.SetString(t)
+		i.Provide(t)
 	}
 }
 
@@ -79,7 +78,7 @@ func (c *Container) Clone(except ...string) *Container {
 	l := c.List(except...)
 	var nl []Item
 	for _, v := range l {
-		nl = append(nl, v.Clone(""))
+		nl = append(nl, v.Clone())
 	}
 	n.Set(nl...)
 	return n
@@ -126,7 +125,7 @@ func (c *Container) TemplateData() map[string]interface{} {
 	ret := make(map[string]interface{})
 	l := c.List()
 	for _, v := range l {
-		ret[v.Undotted()] = v.ToString()
+		ret[v.KeyUndotted()] = v.Provided()
 	}
 	return ret
 }
@@ -137,16 +136,16 @@ func (c *Container) MarshalJSON() ([]byte, error) {
 }
 
 func (c *Container) UnmarshalJSON(b []byte) error {
-	var bi []*BasicItem
-	err := json.Unmarshal(b, &bi)
+	var i []*Mtem
+	err := json.Unmarshal(b, &i)
 	if err != nil {
 		return err
 	}
-	var i []Item
-	for _, v := range bi {
-		i = append(i, NewItem(v.Key, v.Value))
+	var ii []Item
+	for _, v := range i {
+		ii = append(ii, fromMtem(v))
 	}
-	c.Set(i...)
+	c.Set(ii...)
 	return nil
 }
 
@@ -155,65 +154,69 @@ func (c *Container) MarshalYAML() (interface{}, error) {
 }
 
 func (c *Container) UnmarshalYAML(u func(interface{}) error) error {
-	var bi []*BasicItem
-	err := u(&bi)
+	var i []*Mtem
+	err := u(&i)
 	if err != nil {
 		return err
 	}
-	var i []Item
-	for _, v := range bi {
-		i = append(i, NewItem(v.Key, v.Value))
+	var ii []Item
+	for _, v := range i {
+		ii = append(ii, fromMtem(v))
 	}
-	c.Set(i...)
+	c.Set(ii...)
 	return nil
 }
 
 func (c *Container) ToString(k string) string {
 	if i := c.Get(k); i != nil {
-		return i.ToString()
+		if ii, ok := i.(StringItem); ok {
+			return ii.ToString()
+		}
 	}
 	return ""
 }
 
-func (c *Container) ToKVString() string {
-	return fmt.Sprintf("%s:%s", c.Tag(), c.Keys())
-}
-
-func (c *Container) ToKV() (string, interface{}) {
-	return c.Tag(), c.Keys()
+func (c *Container) ToStrings(k string) []string {
+	if i := c.Get(k); i != nil {
+		if ii, ok := i.(StringsItem); ok {
+			return ii.ToStrings()
+		}
+	}
+	return []string{}
 }
 
 func (c *Container) ToBool(k string) bool {
 	if i := c.Get(k); i != nil {
-		return i.ToBool()
+		if ii, ok := i.(BoolItem); ok {
+			return ii.ToBool()
+		}
 	}
 	return false
 }
 
 func (c *Container) ToInt(k string) int {
 	if i := c.Get(k); i != nil {
-		return i.ToInt()
+		if ii, ok := i.(IntItem); ok {
+			return ii.ToInt()
+		}
 	}
 	return 0
 }
 
 func (c *Container) ToFloat(k string) float64 {
 	if i := c.Get(k); i != nil {
-		return i.ToFloat()
+		if ii, ok := i.(FloatItem); ok {
+			return ii.ToFloat()
+		}
 	}
 	return 0
 }
 
-func (c *Container) ToList(k string) []string {
+func (c *Container) ToMulti(k string) *Container {
 	if i := c.Get(k); i != nil {
-		return i.ToList()
-	}
-	return []string{}
-}
-
-func (c *Container) ToMap(k string) map[string]string {
-	if i := c.Get(k); i != nil {
-		return i.ToMap()
+		if ii, ok := i.(MultiItem); ok {
+			return ii.ToMulti()
+		}
 	}
 	return nil
 }
