@@ -71,16 +71,6 @@ func (t *Trie) Item() Item {
 	return t.item
 }
 
-//func (t *Trie) insert(i Item) bool {
-//	return t.put(i, false)
-//}
-
-func (t *Trie) set(items ...Item) {
-	for _, i := range items {
-		t.put(i, true)
-	}
-}
-
 func (t *Trie) get(p Prefix) Item {
 	if p != nil {
 		_, node, found, leftover := t.findSubtree(p)
@@ -321,6 +311,12 @@ func (t *Trie) reset() {
 }
 
 var ErrNilPrefix = Drror("Nil prefix passed into a method call")
+
+func (t *Trie) set(items ...Item) {
+	for _, i := range items {
+		t.put(i, true)
+	}
+}
 
 func (t *Trie) put(item Item, replace bool) bool {
 	key := Prefix(item.Key())

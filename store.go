@@ -14,23 +14,23 @@ import (
 
 type Store interface {
 	Read([]byte) (int, error)
-	In() (*Container, error)
-	Swap(*Container)
-	Out() (*Container, error)
+	In() (*Vector, error)
+	Swap(*Vector)
+	Out() (*Vector, error)
 	Write([]byte) (int, error)
 }
 
 type ReadFunc func(*Retriever) (io.ReadCloser, int64, error)
 
-type InFunc func(string, int64, io.ReadCloser) (*Container, error)
+type InFunc func(string, int64, io.ReadCloser) (*Vector, error)
 
-type OutFunc func(*Container, io.WriteCloser) ([]string, error)
+type OutFunc func(*Vector, io.WriteCloser) ([]string, error)
 
-type WriteFunc func(*Container) (io.WriteCloser, error)
+type WriteFunc func(*Vector) (io.WriteCloser, error)
 
 type store struct {
 	*Retriever
-	c   *Container
+	c   *Vector
 	rfn ReadFunc
 	ifn InFunc
 	ofn OutFunc
@@ -79,7 +79,7 @@ func (s *store) Read(p []byte) (int, error) {
 	return i, err
 }
 
-func (s *store) In() (*Container, error) {
+func (s *store) In() (*Vector, error) {
 	r, n, err := s.rfn(s.Retriever)
 	if err != nil {
 		return nil, err
@@ -92,12 +92,12 @@ func (s *store) In() (*Container, error) {
 	return c, nil
 }
 
-func (s *store) Swap(c *Container) {
+func (s *store) Swap(c *Vector) {
 	s.c = c
 	s.SetRetrieval(c.ToStrings("store.retrival.string"))
 }
 
-func (s *store) Out() (*Container, error) {
+func (s *store) Out() (*Vector, error) {
 	w, err := s.wfn(s.c)
 	if err != nil {
 		return nil, err
@@ -166,10 +166,10 @@ func OutStore(out *os.File) StoreFn {
 			func(rt *Retriever) (io.ReadCloser, int64, error) {
 				return nil, 0, FunctionNotImplemented("Read Function", "STDOUT")
 			},
-			func(r string, n int64, rr io.ReadCloser) (*Container, error) {
+			func(r string, n int64, rr io.ReadCloser) (*Vector, error) {
 				return nil, FunctionNotImplemented("In Function", "STDOUT")
 			},
-			func(c *Container, w io.WriteCloser) ([]string, error) {
+			func(c *Vector, w io.WriteCloser) ([]string, error) {
 				b, err := c.MarshalJSON()
 				if err != nil {
 					return nil, err
@@ -178,7 +178,7 @@ func OutStore(out *os.File) StoreFn {
 				w.Close()
 				return rs, err
 			},
-			func(c *Container) (io.WriteCloser, error) {
+			func(c *Vector) (io.WriteCloser, error) {
 				return out, nil
 			},
 			rs...,
@@ -191,7 +191,7 @@ var YamlStore = &StoreMaker{"yaml", yamlStore}
 func yamlStore(rs []string) Store {
 	return NewStore(
 		readCloserFrom("yaml"),
-		func(r string, n int64, rr io.ReadCloser) (*Container, error) {
+		func(r string, n int64, rr io.ReadCloser) (*Vector, error) {
 			c := New("")
 			b := make([]byte, n)
 			_, err := rr.Read(b)
@@ -204,7 +204,7 @@ func yamlStore(rs []string) Store {
 			}
 			return c, nil
 		},
-		func(c *Container, w io.WriteCloser) ([]string, error) {
+		func(c *Vector, w io.WriteCloser) ([]string, error) {
 			retrieval := c.ToStrings("store.retrieval.string")
 			y, err := yaml.Marshal(&c)
 			if err != nil {
@@ -224,13 +224,13 @@ var (
 	JsonFStore = &StoreMaker{"jsonf", JsonStorer(indented)}
 )
 
-type jsonMarshaler func(*Container) ([]byte, error)
+type jsonMarshaler func(*Vector) ([]byte, error)
 
-func regular(c *Container) ([]byte, error) {
+func regular(c *Vector) ([]byte, error) {
 	return json.Marshal(&c)
 }
 
-func indented(c *Container) ([]byte, error) {
+func indented(c *Vector) ([]byte, error) {
 	return json.MarshalIndent(&c, "", "    ")
 }
 
@@ -238,7 +238,7 @@ func JsonStorer(jm jsonMarshaler) StoreFn {
 	return func(rs []string) Store {
 		return NewStore(
 			readCloserFrom("json"),
-			func(r string, n int64, rr io.ReadCloser) (*Container, error) {
+			func(r string, n int64, rr io.ReadCloser) (*Vector, error) {
 				c := New("")
 				b := make([]byte, n)
 				_, err := rr.Read(b)
@@ -251,7 +251,7 @@ func JsonStorer(jm jsonMarshaler) StoreFn {
 				}
 				return c, nil
 			},
-			func(c *Container, w io.WriteCloser) ([]string, error) {
+			func(c *Vector, w io.WriteCloser) ([]string, error) {
 				retrieval := c.ToStrings("store.retrieval.string")
 				j, err := jm(c)
 				if err != nil {
@@ -275,7 +275,7 @@ func insufficient(s []string, i int) error {
 }
 
 func writeCloserFrom(ext string) WriteFunc {
-	return func(c *Container) (io.WriteCloser, error) {
+	return func(c *Vector) (io.WriteCloser, error) {
 		rs := c.ToStrings("store.retrieval.string")
 		if err := insufficient(rs, 3); err != nil {
 			return nil, err

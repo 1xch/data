@@ -75,9 +75,9 @@ func TestStringItem(t *testing.T) {
 }
 
 func TestStringsItem(t *testing.T) {
-	i, ok := li.(StringsItem)
+	i, ok := ssi.(StringsItem)
 	if !ok {
-		t.Errorf("item is not StringsItem %v", li)
+		t.Errorf("item is not StringsItem %v", ssi)
 	}
 	if ok {
 		vl1 := i.ToStrings()
@@ -92,10 +92,28 @@ func TestStringsItem(t *testing.T) {
 	}
 }
 
+func TestStringsListItem(t *testing.T) {
+	//i, ok := ssi.(StringsItem)
+	//if !ok {
+	//	t.Errorf("item is not StringsItem %v", ssi)
+	//}
+	//if ok {
+	//	vl1 := i.ToStrings()
+	//	if len(vl1) != 3 || vl1[2] != "c" {
+	//		t.Errorf("strings item is not ['a', 'b', 'c'], it is %v", vl1)
+	//	}
+	//	i.SetStrings("one", "two", "three", "four")
+	//	vl2 := i.ToStrings()
+	//	if len(vl2) != 4 || vl2[3] != "four" {
+	//		t.Errorf("strings item is not ['one', 'two', 'three', 'four'], it is %v", vl2)
+	//	}
+	//}
+}
+
 func TestBoolItem(t *testing.T) {
 	i, ok := bi.(BoolItem)
 	if !ok {
-		t.Errorf("item is not BoolItem %v", li)
+		t.Errorf("item is not BoolItem %v", bi)
 	}
 	if ok {
 		if v1 := i.ToBool(); v1 {
@@ -128,7 +146,7 @@ func TestIntItem(t *testing.T) {
 func TestFloatItem(t *testing.T) {
 	i, ok := fi.(FloatItem)
 	if !ok {
-		t.Errorf("item is not FloatItem %v", li)
+		t.Errorf("item is not FloatItem %v", fi)
 	}
 	if ok {
 		if v1 := i.ToFloat(); v1 != 9.9 {
@@ -141,18 +159,18 @@ func TestFloatItem(t *testing.T) {
 	}
 }
 
-func TestMultiItem(t *testing.T) {
-	i, ok := mi.(MultiItem)
+func TestVectorItem(t *testing.T) {
+	i, ok := vi.(VectorItem)
 	if !ok {
-		t.Errorf("item is not MultiItem %v", mi)
+		t.Errorf("item is not VectorItem %v", vi)
 	}
 	if ok {
-		v1 := i.ToMulti()
+		v1 := i.ToVector()
 		ty := reflect.TypeOf(v1)
-		if ty.String() != "*data.Container" {
-			t.Errorf("item value is not *data.Container: %v", ty)
+		if ty.String() != "*data.Vector" {
+			t.Errorf("item value is not *data.Vector: %v", ty)
 		}
-		ci := v1.ToString("multi.1")
+		ci := v1.ToString("vector.1")
 		if ci != "ONE" {
 			t.Error("multi item container item is not 'ONE': %s", ci)
 		}

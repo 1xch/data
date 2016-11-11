@@ -14,7 +14,7 @@ func TestContainer(t *testing.T) {
 
 	t1, t2, t3 := c1.Tag(), c2.Tag(), c3.Tag()
 	if t1 != "TEST_ONE" || t2 != "TEST_TWO" || t3 != "TEST_THREE" {
-		t.Errorf("error in tagging containers, expected 'TEST_ONE', 'TEST_TWO', 'TEST_THREE' got %s, %s, %s", t1, t2, t3)
+		t.Errorf("error in tagging vectors, expected 'TEST_ONE', 'TEST_TWO', 'TEST_THREE' got %s, %s, %s", t1, t2, t3)
 	}
 
 	k1, k2, k3 := c1.Keys(), c2.Keys(), c3.Keys()
@@ -46,7 +46,7 @@ func TestContainer(t *testing.T) {
 	}
 
 	td := c1.TemplateData()
-	if v, exists := td["ContainerTag"]; v != "TEST_ONE" || !exists {
+	if v, exists := td["VectorTag"]; v != "TEST_ONE" || !exists {
 		t.Errorf("incorrect template data item: %v", v)
 	}
 
@@ -55,9 +55,4 @@ func TestContainer(t *testing.T) {
 	if len(ks) != 0 {
 		t.Errorf("cleared keys length should be zero but was not: existing keys %v", ks)
 	}
-
-	//for _, v := range c1.Keys() {
-	//	spl := strings.Split(v, ".")
-	//	spew.Dump(spl, len(spl))
-	//}
 }

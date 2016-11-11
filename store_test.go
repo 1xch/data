@@ -39,7 +39,7 @@ func TestStore(t *testing.T) {
 	os.Remove(yamlLoc)
 }
 
-type storeTestFunc func(*testing.T, Store, *Container)
+type storeTestFunc func(*testing.T, Store, *Vector)
 
 func storeTest(t *testing.T, trs []string, removal string, fn ...storeTestFunc) {
 	c := base.Clone()
@@ -71,7 +71,7 @@ func TestOutStore(t *testing.T) {
 
 	trs := []string{"OUT", currentDir, "out.txt"}
 
-	tf := func(t *testing.T, s Store, c *Container) {
+	tf := func(t *testing.T, s Store, c *Vector) {
 		s.Swap(c)
 		if _, err := s.Out(); err != nil {
 			t.Error(err)
@@ -84,7 +84,7 @@ func TestOutStore(t *testing.T) {
 	storeTest(t, trs, loc, tf)
 }
 
-func containerFromStoreTest(t *testing.T, s Store, c *Container) {
+func containerFromStoreTest(t *testing.T, s Store, c *Vector) {
 	c1 := c
 	s.Swap(c1)
 
@@ -134,22 +134,22 @@ func TestYamlStore(t *testing.T) {
 }
 
 type testStore struct {
-	c *Container
+	c *Vector
 }
 
 func (s *testStore) Read([]byte) (int, error) {
 	return 7, nil
 }
 
-func (s *testStore) In() (*Container, error) {
+func (s *testStore) In() (*Vector, error) {
 	return s.c, nil
 }
 
-func (s *testStore) Swap(c *Container) {
+func (s *testStore) Swap(c *Vector) {
 	s.c = c
 }
 
-func (s *testStore) Out() (*Container, error) {
+func (s *testStore) Out() (*Vector, error) {
 	return s.c, nil
 }
 
@@ -178,7 +178,7 @@ func TestCustomStore(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if tag := c1.ToString("container.tag"); tag != "CUSTOM" {
+	if tag := c1.ToString("vector.tag"); tag != "CUSTOM" {
 		t.Errorf("Custom store tag is not 'CUSTOM', it is %s", tag)
 	}
 
@@ -190,7 +190,7 @@ func TestCustomStore(t *testing.T) {
 	}
 	t1, t2 := c2.Tag(), c3.Tag()
 	if t1 != t2 {
-		t.Errorf("returned custom store container tags not equal, but should be %s != %s", t1, t2)
+		t.Errorf("returned custom store vector tags not equal, but should be %s != %s", t1, t2)
 	}
 
 	if n, err := s.Write([]byte{}); n != 77 || err != nil {

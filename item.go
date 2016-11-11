@@ -101,8 +101,7 @@ type Mtem struct {
 }
 
 func fromFloat(i *item) Item {
-	v, ok := i.provided.(float64)
-	if ok {
+	if v, ok := i.provided.(float64); ok {
 		if math.Mod(v, 1) == 0 {
 			return &intItem{i}
 		}
@@ -110,7 +109,7 @@ func fromFloat(i *item) Item {
 	return &floatItem{i}
 }
 
-func fromArrayedInterface(i *item) Item {
+func fromVector(i *item) Item {
 	v := i.Value()
 
 	var s []string
@@ -123,15 +122,14 @@ func fromArrayedInterface(i *item) Item {
 		}
 	}
 
-	c := New("")
-	if err := json.Unmarshal(v, &c); err == nil {
-		return &multiItem{
+	vec := New("")
+	if err := json.Unmarshal(v, &vec); err == nil {
+		return &vectorItem{
 			&item{
 				key:      i.key,
-				provided: c,
+				provided: vec,
 			},
 		}
-
 	}
 
 	return i
@@ -151,7 +149,7 @@ func fromMtem(m *Mtem) Item {
 	case float64:
 		return fromFloat(i)
 	case []interface{}:
-		return fromArrayedInterface(i)
+		return fromVector(i)
 	}
 
 	return i
@@ -363,23 +361,23 @@ func (i *floatItem) Clone() Item {
 	return &floatItem{ii}
 }
 
-type MultiItem interface {
+type VectorItem interface {
 	Item
-	ToMulti() *Container
-	SetMulti(*Container)
+	ToVector() *Vector
+	SetVector(*Vector)
 }
 
-type multiItem struct {
+type vectorItem struct {
 	Item
 }
 
-func NewMultiItem(key string, v *Container) Item {
+func NewVectorItem(key string, v *Vector) Item {
 	i := KeyedItem(key)
 	i.Provide(v)
-	return &multiItem{i}
+	return &vectorItem{i}
 }
 
-func (i *multiItem) ToMulti() *Container {
+func (i *vectorItem) ToVector() *Vector {
 	ret := New("")
 	err := json.Unmarshal(i.Value(), &ret)
 	if err != nil {
@@ -388,13 +386,13 @@ func (i *multiItem) ToMulti() *Container {
 	return ret
 }
 
-func (i *multiItem) SetMulti(v *Container) {
+func (i *vectorItem) SetVector(v *Vector) {
 	i.Provide(v)
 }
 
-func (i *multiItem) Clone() Item {
-	c := i.ToMulti()
+func (i *vectorItem) Clone() Item {
+	c := i.ToVector()
 	ii := i.Item.Clone()
 	ii.Provide(c)
-	return &multiItem{ii}
+	return &vectorItem{ii}
 }
