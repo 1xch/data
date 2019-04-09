@@ -5,12 +5,15 @@ import "testing"
 func TestContainer(t *testing.T) {
 	c1 := base
 	c1.Retag("TEST_ONE")
+	c1kl := len(c1.Keys())
 
 	c2 := c1.Clone("a.list", "a.map")
 	c2.Retag("TEST_TWO")
+	c2kl := len(c2.Keys())
 
 	c3 := c1.CloneAs("TEST_THREE")
 	c3.Reset()
+	c3kl := len(c3.Keys())
 
 	t1, t2, t3 := c1.Tag(), c2.Tag(), c3.Tag()
 	if t1 != "TEST_ONE" || t2 != "TEST_TWO" || t3 != "TEST_THREE" {
@@ -19,8 +22,8 @@ func TestContainer(t *testing.T) {
 
 	k1, k2, k3 := c1.Keys(), c2.Keys(), c3.Keys()
 	l1, l2, l3 := len(k1), len(k2), len(k3)
-	if l1 != 11 || l2 != 10 || l3 != 2 {
-		t.Errorf("keys lists incorrect expected keys lists of 11, 10, 2 and received %d, %d, %d", l1, l2, l3)
+	if l1 != c1kl || l2 != c2kl || l3 != c3kl {
+		t.Errorf("keys lists incorrect expected keys lists of %d, %d, %d and received %d, %d, %d", c1kl, c2kl, c3kl, l1, l2, l3)
 	}
 
 	i1, i2, i3 := c1.Get("a.int"), c2.Get("a.int"), c3.Get("a.int")

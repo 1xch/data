@@ -1,8 +1,9 @@
 package data
 
 import (
-	"crypto/rand"
+	"bytes"
 	"errors"
+	"math/rand"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -19,6 +20,16 @@ type testData struct {
 	key    string
 	value  string
 	retVal bool
+}
+
+func tinsert(t *testing.T, tr *Trie, d []testData) {
+	for _, v := range d {
+		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
+		ni := NewStringItem(v.key, v.value)
+		if ok := tr.put(ni, false); ok != v.retVal {
+			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
+		}
+	}
 }
 
 func TestTrie_ConstructorOptions(t *testing.T) {
@@ -181,13 +192,7 @@ func TestTrie_InsertDense(t *testing.T) {
 		{"abz", "5", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 }
 
 func TestTrie_InsertDensePreceeding(t *testing.T) {
@@ -248,13 +253,7 @@ func TestTrie_InsertDenseDuplicatePrefixes(t *testing.T) {
 		{"abe", "4", failure},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 }
 
 func TestTrie_DeleteDense(t *testing.T) {
@@ -289,13 +288,7 @@ func TestTrie_DeleteDense(t *testing.T) {
 		{"abz", "5", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	for _, v := range data {
 		t.Logf("DELETE word=%v, success=%v", v.key, v.retVal)
@@ -305,12 +298,22 @@ func TestTrie_DeleteDense(t *testing.T) {
 	}
 }
 
+var letterRunes = []rune("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randStringRunes(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
+
 func TestTrie_DeleteLeakageDense(t *testing.T) {
 	trie := NewTrie()
 
 	genTestData := func() *testData {
 		// Generate a random hash as a key.
-		key := V4Quick()
+		key := randStringRunes(100) //V4Quick()
 		return &testData{key: key, value: "v", retVal: success}
 	}
 
@@ -365,13 +368,7 @@ func TestTrie_InsertDifferentPrefixes(t *testing.T) {
 		{"Jenikuuuuuuuuuuuuuu", "Jenik Poustevnicek", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 }
 
 func TestTrie_InsertDuplicatePrefixes(t *testing.T) {
@@ -382,13 +379,7 @@ func TestTrie_InsertDuplicatePrefixes(t *testing.T) {
 		{"Pepan", "Pepan Zdepan", failure},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 }
 
 func TestTrie_InsertVariousPrefixes(t *testing.T) {
@@ -405,13 +396,7 @@ func TestTrie_InsertVariousPrefixes(t *testing.T) {
 		{"Pepanek", "Pepanek Zemlicka", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 }
 
 func TestTrie_InsertAndMatchPrefix(t *testing.T) {
@@ -442,13 +427,7 @@ func TestTrie_SetGet(t *testing.T) {
 		{"Pepanek", "Pepanek Zemlicka", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	for _, v := range data {
 		t.Logf("SET %q to 10", v.key)
@@ -488,13 +467,7 @@ func TestTrie_Match(t *testing.T) {
 		{"Pepanek", "Pepanek Zemlicka", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	for _, v := range data {
 		matched := trie.Match(Prefix(v.key))
@@ -542,13 +515,7 @@ func TestTrie_MatchSubtree(t *testing.T) {
 		{"Pepanek", "Pepanek Zemlicka", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Errorf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	for _, v := range data {
 		key := Prefix(v.key[:3])
@@ -571,13 +538,7 @@ func TestTrie_Visit(t *testing.T) {
 		{"Jenik", "4", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Fatalf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	if err := trie.Visit(func(prefix Prefix, item Item) error {
 		name := item.Key()
@@ -602,13 +563,7 @@ func TestTrie_VisitSkipSubtree(t *testing.T) {
 		{"Jenik", "4", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Fatalf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	vf := func(prefix Prefix, item Item) error {
 		t.Logf("VISITING prefix=%q, item=%v", prefix, item)
@@ -640,13 +595,7 @@ func TestTrie_VisitReturnError(t *testing.T) {
 		{"Jenik", "4", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		ni := NewStringItem(v.key, v.value)
-		if ok := trie.put(ni, false); ok != v.retVal {
-			t.Fatalf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	someErr := errors.New("Something exploded")
 	vf := func(prefix Prefix, item Item) error {
@@ -667,40 +616,37 @@ func TestTrie_VisitReturnError(t *testing.T) {
 	}
 }
 
-/*
 func TestTrie_VisitSubtree(t *testing.T) {
 	trie := NewTrie()
 
 	data := []testData{
-		{"Pepa", 0, success},
-		{"Pepa Zdepa", 1, success},
-		{"Pepa Kuchar", 2, success},
-		{"Honza", 3, success},
-		{"Jenik", 4, success},
+		{"Pepa", "0", success},
+		{"Pepa Zdepa", "1", success},
+		{"Pepa Kuchar", "2", success},
+		{"Honza", "3", success},
+		{"Jenik", "4", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		if ok := trie.Insert([]byte(v.key), v.value); ok != v.retVal {
-			t.Fatalf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	var counter int
 	subtreePrefix := []byte("Pep")
 	t.Log("VISIT Pep")
-	if err := trie.VisitSubtree(subtreePrefix, func(prefix Prefix, item Item) error {
+
+	w := func(prefix Prefix, item Item) error {
 		t.Logf("VISITING prefix=%q, item=%v", prefix, item)
 		if !bytes.HasPrefix(prefix, subtreePrefix) {
 			t.Errorf("Unexpected prefix encountered, %q does not extend %q",
 				prefix, subtreePrefix)
 		}
-		if len(prefix) > len(data[item.(int)].key) {
+		if len(prefix) > len(item.Key()) {
 			t.Fatalf("Something is rather fishy here, prefix=%q", prefix)
 		}
 		counter++
 		return nil
-	}); err != nil {
+	}
+
+	if err := trie.VisitSubtree(subtreePrefix, w); err != nil {
 		t.Fatal(err)
 	}
 
@@ -713,26 +659,21 @@ func TestTrie_VisitPrefixes(t *testing.T) {
 	trie := NewTrie()
 
 	data := []testData{
-		{"P", 0, success},
-		{"Pe", 1, success},
-		{"Pep", 2, success},
-		{"Pepa", 3, success},
-		{"Pepa Zdepa", 4, success},
-		{"Pepa Kuchar", 5, success},
-		{"Honza", 6, success},
-		{"Jenik", 7, success},
+		{"P", "0", success},
+		{"Pe", "1", success},
+		{"Pep", "2", success},
+		{"Pepa", "3", success},
+		{"Pepa Zdepa", "4", success},
+		{"Pepa Kuchar", "5", success},
+		{"Honza", "6", success},
+		{"Jenik", "7", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		if ok := trie.Insert([]byte(v.key), v.value); ok != v.retVal {
-			t.Fatalf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	var counter int
 	word := []byte("Pepa")
-	if err := trie.VisitPrefixes(word, func(prefix Prefix, item Item) error {
+	w := func(prefix Prefix, item Item) error {
 		t.Logf("VISITING prefix=%q, item=%v", prefix, item)
 		if !bytes.HasPrefix(word, prefix) {
 			t.Errorf("Unexpected prefix encountered, %q is not a prefix of %q",
@@ -740,7 +681,8 @@ func TestTrie_VisitPrefixes(t *testing.T) {
 		}
 		counter++
 		return nil
-	}); err != nil {
+	}
+	if err := trie.VisitPrefixes(word, w); err != nil {
 		t.Fatal(err)
 	}
 
@@ -758,12 +700,7 @@ func TestParticiaTrie_Delete(t *testing.T) {
 		{"Jenik", "Jenik Poustevnicek", success},
 	}
 
-	for _, v := range data {
-		t.Logf("INSERT prefix=%v, item=%v, success=%v", v.key, v.value, v.retVal)
-		if ok := trie.Insert([]byte(v.key), v.value); ok != v.retVal {
-			t.Fatalf("Unexpected return value, expected=%v, got=%v", v.retVal, ok)
-		}
-	}
+	tinsert(t, trie, data)
 
 	for _, v := range data {
 		t.Logf("DELETE word=%v, success=%v", v.key, v.retVal)
@@ -773,6 +710,7 @@ func TestParticiaTrie_Delete(t *testing.T) {
 	}
 }
 
+/*
 func TestParticiaTrie_DeleteLeakageSparse(t *testing.T) {
 	trie := NewTrie()
 

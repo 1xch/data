@@ -3,33 +3,54 @@ package data
 import (
 	"bytes"
 	"encoding/json"
+	"strconv"
 	"sync"
 )
 
+// A sync.Mutex bound struct that wraps a Trie holding package level Item.
 type Vector struct {
-	l *sync.RWMutex
+	l  *sync.RWMutex
+	o  []Option
+	bl []string
 	*Trie
 }
 
+//
 func New(tag string, o ...Option) *Vector {
-	l := &sync.RWMutex{}
 	t := NewTrie(o...)
 	v := &Vector{
-		l, t,
+		nil, o, make([]string, 0), t,
 	}
-	if tag != "" {
-		v.Set(
-			NewStringItem("vector.tag", tag),
-			NewStringItem("vector.id", V4Quick()),
-		)
-	}
+	v.mutexSet()
+	v.Set(NewStringItem("vector.tag", tag))
 	return v
 }
 
+func (v *Vector) mutexSet() {
+	if v.l == nil {
+		v.l = &sync.RWMutex{}
+	}
+}
+
+func (v *Vector) trieSet() {
+	if v.Trie == nil {
+		v.Trie = NewTrie(v.o...)
+	}
+}
+
+// unmarshaling a raw Vector can be painful in certain situations,
+// this ensures the process is less so
+func (v *Vector) ensureNotEmpty() {
+	v.mutexSet()
+	v.trieSet()
+}
+
+//
 func (v *Vector) Tag() string {
 	return v.ToString("vector.tag")
 }
 
+//
 func (v *Vector) Retag(t string) {
 	i := v.Get("vector.tag")
 	if i != nil {
@@ -37,6 +58,7 @@ func (v *Vector) Retag(t string) {
 	}
 }
 
+//
 func (v *Vector) Keys() []string {
 	var ret []string
 	w := func(p Prefix, i Item) error {
@@ -47,6 +69,7 @@ func (v *Vector) Keys() []string {
 	return ret
 }
 
+//
 func (v *Vector) Get(k string) Item {
 	v.l.RLock()
 	key := Prefix(k)
@@ -55,6 +78,7 @@ func (v *Vector) Get(k string) Item {
 	return i
 }
 
+//
 func (v *Vector) Match(k string) []Item {
 	v.l.RLock()
 	defer v.l.RUnlock()
@@ -70,12 +94,38 @@ func (v *Vector) Match(k string) []Item {
 	return ret
 }
 
+func (v *Vector) Blacklist(keys ...string) {
+	v.bl = append(v.bl, keys...)
+}
+
+func inList(k string, bl []string) bool {
+	for _, v := range bl {
+		if k == v {
+			return true
+		}
+	}
+	return false
+}
+
+func notBlacklisted(bl []string, i []Item) []Item {
+	var ret []Item
+	for _, ii := range i {
+		if !inList(ii.Key(), bl) {
+			ret = append(ret, ii)
+		}
+	}
+	return ret
+}
+
+//
 func (v *Vector) Set(i ...Item) {
+	nbi := notBlacklisted(v.bl, i)
 	v.l.Lock()
-	v.set(i...)
+	v.set(nbi...)
 	v.l.Unlock()
 }
 
+//
 func (v *Vector) Merge(vs ...*Vector) {
 	for _, vv := range vs {
 		l := vv.List("vector.tag", "vector.id")
@@ -83,8 +133,9 @@ func (v *Vector) Merge(vs ...*Vector) {
 	}
 }
 
+//
 func (v *Vector) Clone(except ...string) *Vector {
-	except = append(except, "vector.tag", "vector.id")
+	except = append(except, "vector.tag")
 	n := New(v.Tag())
 	l := v.List(except...)
 	var nl []Item
@@ -95,6 +146,7 @@ func (v *Vector) Clone(except ...string) *Vector {
 	return n
 }
 
+//
 func (v *Vector) CloneAs(tag string, except ...string) *Vector {
 	nc := v.Clone(except...)
 	nc.Retag(tag)
@@ -110,6 +162,7 @@ func match(ss []string, s string) bool {
 	return false
 }
 
+// Returns a list of Item, EXCEPT those matching the provided key strings.
 func (v *Vector) List(except ...string) []Item {
 	v.l.RLock()
 	defer v.l.RUnlock()
@@ -124,16 +177,22 @@ func (v *Vector) List(except ...string) []Item {
 	return ret
 }
 
+// Clears the Vector of all Item.
 func (v *Vector) Clear() {
 	v.reset()
 }
 
+// Clears the Vector of all Item, except those matching the internal "vector"
+// key e.g. "vector.tag", "vector.id", etc et al.
 func (v *Vector) Reset() {
 	ci := v.Match("vector")
 	v.reset()
 	v.Set(ci...)
 }
 
+// Returns the Vector data as a map[string]interface{} suitable for use with
+// text.Template or html.Template. Keys are undotted form(e.g. key.key becomes
+// KeyKey).
 func (v *Vector) TemplateData() map[string]interface{} {
 	ret := make(map[string]interface{})
 	l := v.List()
@@ -143,12 +202,15 @@ func (v *Vector) TemplateData() map[string]interface{} {
 	return ret
 }
 
+// json.Marshaler
 func (v *Vector) MarshalJSON() ([]byte, error) {
 	l := v.List()
 	return json.Marshal(&l)
 }
 
+// json.Unmarshaler
 func (v *Vector) UnmarshalJSON(b []byte) error {
+	v.ensureNotEmpty()
 	var i []*Mtem
 	err := json.Unmarshal(b, &i)
 	if err != nil {
@@ -162,11 +224,14 @@ func (v *Vector) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// yaml.Marshaler
 func (v *Vector) MarshalYAML() (interface{}, error) {
 	return v.List(), nil
 }
 
+// yaml.Unmarshaler
 func (v *Vector) UnmarshalYAML(u func(interface{}) error) error {
+	v.ensureNotEmpty()
 	var i []*Mtem
 	err := u(&i)
 	if err != nil {
@@ -180,6 +245,7 @@ func (v *Vector) UnmarshalYAML(u func(interface{}) error) error {
 	return nil
 }
 
+// Return a string from key matching a stored StringItem.
 func (v *Vector) ToString(k string) string {
 	if i := v.Get(k); i != nil {
 		if ii, ok := i.(StringItem); ok {
@@ -189,67 +255,176 @@ func (v *Vector) ToString(k string) string {
 	return ""
 }
 
+// Set a StringItem with the provided key and value.
 func (v *Vector) SetString(k, vi string) {
 	ni := NewStringItem(k, vi)
 	v.Set(ni)
 }
 
+// Return an array of strings from a matching key.
+// Storing a StringsItem is relatively faster, but will attempt to return strings
+// from a StringItem.
 func (v *Vector) ToStrings(k string) []string {
 	if i := v.Get(k); i != nil {
 		if ii, ok := i.(StringsItem); ok {
 			return ii.ToStrings()
 		}
+		//
 	}
 	return []string{}
 }
 
+// Set a StringsItem with the provided key and string values.
 func (v *Vector) SetStrings(k string, vi ...string) {
 	ni := NewStringsItem(k, vi...)
 	v.Set(ni)
 }
 
+// Return a boolean from a matching key.
+// Storing a BoolItem is relatively faster, but will attempt to return a bool
+// from a StringItem.
 func (v *Vector) ToBool(k string) bool {
 	if i := v.Get(k); i != nil {
 		if ii, ok := i.(BoolItem); ok {
 			return ii.ToBool()
 		}
+		if iis, ok := i.(StringItem); ok {
+			v := iis.ToString()
+			if b, err := strconv.ParseBool(v); err == nil {
+				return b
+			}
+		}
 	}
 	return false
 }
 
+// Set a BoolItem with the provided key and boolean value.
 func (v *Vector) SetBool(k string, vi bool) {
 	ni := NewBoolItem(k, vi)
 	v.Set(ni)
 }
 
+// Return an integer from a matching key.
+// Storing an IntItem is relatively faster, but will attempt to return an int
+// from a StringItem.
 func (v *Vector) ToInt(k string) int {
 	if i := v.Get(k); i != nil {
 		if ii, ok := i.(IntItem); ok {
 			return ii.ToInt()
 		}
-	}
-	return 0
-}
-
-func (v *Vector) SetInt(k string, vi int) {
-	ni := NewIntItem(k, vi)
-	v.Set(ni)
-}
-
-func (v *Vector) ToFloat(k string) float64 {
-	if i := v.Get(k); i != nil {
-		if ii, ok := i.(FloatItem); ok {
-			return ii.ToFloat()
+		if iii, ok := i.(StringItem); ok {
+			v := iii.ToString()
+			if ri, err := strconv.ParseInt(v, 10, 64); err == nil {
+				return int(ri)
+			}
 		}
 	}
 	return 0
 }
 
-func (v *Vector) SetFloat(k string, vi float64) {
-	ni := NewFloatItem(k, vi)
+// Set an IntItem with the provided key and integer value.
+func (v *Vector) SetInt(k string, vi int) {
+	ni := NewIntItem(k, vi)
 	v.Set(ni)
 }
 
+// Return an int64 from a matching key.
+// Storing an Int64Item is relatively faster, but will attempt to return an int64
+// from a StringItem.
+func (v *Vector) ToInt64(k string) int64 {
+	if i := v.Get(k); i != nil {
+		if ii, ok := i.(Int64Item); ok {
+			return ii.ToInt64()
+		}
+		if iii, ok := i.(StringItem); ok {
+			v := iii.ToString()
+			if r, err := strconv.ParseInt(v, 10, 64); err == nil {
+				return r
+			}
+		}
+	}
+	return 0
+}
+
+// Set an Int64Item with the provided key and int64 value.
+func (v *Vector) SetInt64(k string, vi int64) {
+	ni := NewInt64Item(k, vi)
+	v.Set(ni)
+}
+
+// Return an uint from a key matching a stored UintItem.
+// Storing a UintItem is relatively faster, but will attempt to return a uint
+// from a StringItem.
+func (v *Vector) ToUint(k string) uint {
+	if i := v.Get(k); i != nil {
+		if ii, ok := i.(UintItem); ok {
+			return ii.ToUint()
+		}
+		if iii, ok := i.(StringItem); ok {
+			v := iii.ToString()
+			if r, err := strconv.ParseUint(v, 10, 64); err == nil {
+				return uint(r)
+			}
+		}
+	}
+	return 0
+}
+
+// Set an UintItem with the provided key and uint value.
+func (v *Vector) SetUint(k string, vi uint) {
+	ni := NewUintItem(k, vi)
+	v.Set(ni)
+}
+
+// Return an uint64 from a key matching a stored Uint64Item.
+// Storing a Uint64Item is relatively faster, but will attempt to return a uint64
+// from a StringItem.
+func (v *Vector) ToUint64(k string) uint64 {
+	if i := v.Get(k); i != nil {
+		if ii, ok := i.(Uint64Item); ok {
+			return ii.ToUint64()
+		}
+		if iii, ok := i.(StringItem); ok {
+			v := iii.ToString()
+			if r, err := strconv.ParseUint(v, 10, 64); err == nil {
+				return r
+			}
+		}
+	}
+	return 0
+}
+
+// Set an Uint64Item with the provided key and uint64 value.
+func (v *Vector) SetUint64(k string, vi uint64) {
+	ni := NewUint64Item(k, vi)
+	v.Set(ni)
+}
+
+// Return a float64 from a key matching a stored Float64Item.
+// Storing a float64Item is relatively faster, but will attempt to return a float64
+// from a StringItem.
+func (v *Vector) ToFloat64(k string) float64 {
+	if i := v.Get(k); i != nil {
+		if ii, ok := i.(Float64Item); ok {
+			return ii.ToFloat64()
+		}
+		if iii, ok := i.(StringItem); ok {
+			v := iii.ToString()
+			if rf, err := strconv.ParseFloat(v, 64); err == nil {
+				return rf
+			}
+		}
+	}
+	return 0
+}
+
+/// Set a Float64Item with the provided key and float64 value.
+func (v *Vector) SetFloat64(k string, vi float64) {
+	ni := NewFloat64Item(k, vi)
+	v.Set(ni)
+}
+
+// Return a *Vector from a key matching a stored VectorItem.
 func (v *Vector) ToVector(k string) *Vector {
 	if i := v.Get(k); i != nil {
 		if ii, ok := i.(VectorItem); ok {
@@ -259,6 +434,7 @@ func (v *Vector) ToVector(k string) *Vector {
 	return nil
 }
 
+// Set a VectorItem with the provided key and *Vector value.
 func (v *Vector) SetVector(k string, vi *Vector) {
 	ni := NewVectorItem(k, vi)
 	v.Set(ni)

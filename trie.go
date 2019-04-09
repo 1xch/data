@@ -5,13 +5,18 @@ import (
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/Laughs-In-Flowers/xrr"
 )
 
+//
 type Prefix []byte
 
+//
 type VisitorFunc func(Prefix, Item) error
 
-// a trie mostly constructed from https://github.com/tchap/go-patricia
+// A trie constructed from https://github.com/tchap/go-patricia with a
+// variety of changes and additions(and the opposite of optimisations).
 type Trie struct {
 	prefix                   Prefix
 	maxPrefixPerNode         int
@@ -25,6 +30,7 @@ const (
 	DefaultMaxChildrenPerSparseNode = 8
 )
 
+//
 type Option func(*Trie)
 
 func NewTrie(options ...Option) *Trie {
@@ -45,28 +51,33 @@ func NewTrie(options ...Option) *Trie {
 	return trie
 }
 
+//
 func MaxPrefixPerNode(value int) Option {
 	return func(t *Trie) {
 		t.maxPrefixPerNode = value
 	}
 }
 
+//
 func MaxChildrenPerSparseNode(value int) Option {
 	return func(t *Trie) {
 		t.maxChildrenPerSparseNode = value
 	}
 }
 
+//
 func WithPrefix(p string) Option {
 	return func(t *Trie) {
 		t.prefix = Prefix(p)
 	}
 }
 
+//
 func (t *Trie) Tagged() string {
 	return string(t.prefix)
 }
 
+//
 func (t *Trie) Item() Item {
 	return t.item
 }
@@ -82,21 +93,26 @@ func (t *Trie) get(p Prefix) Item {
 	return nil
 }
 
-var NoItemError = Drror("No item with the prefix %s available.").Out
+//
+var NoItemError = xrr.Xrror("No item with the prefix %s available.").Out
 
+//
 func (t *Trie) Match(p Prefix) bool {
 	return t.get(p) != nil
 }
 
+//
 func (t *Trie) MatchSubtree(p Prefix) bool {
 	_, _, matched, _ := t.findSubtree(p)
 	return matched
 }
 
+//
 func (t *Trie) Visit(v VisitorFunc) error {
 	return t.walk(nil, v)
 }
 
+//
 func (t *Trie) VisitSubtree(p Prefix, v VisitorFunc) error {
 	// Nil prefix not allowed.
 	if p == nil {
@@ -119,6 +135,7 @@ func (t *Trie) VisitSubtree(p Prefix, v VisitorFunc) error {
 	return root.walk(p, v)
 }
 
+//
 func (t *Trie) VisitPrefixes(p Prefix, v VisitorFunc) error {
 	// Nil key not allowed.
 	if p == nil {
@@ -168,6 +185,7 @@ func (t *Trie) VisitPrefixes(p Prefix, v VisitorFunc) error {
 	}
 }
 
+//
 func (t *Trie) Delete(p Prefix) bool {
 	// Nil prefix not allowed.
 	if p == nil {
@@ -258,6 +276,7 @@ Compact:
 	return true
 }
 
+//
 func (t *Trie) DeleteSubtree(p Prefix) bool {
 	// Nil prefix not allowed.
 	if p == nil {
@@ -310,7 +329,7 @@ func (t *Trie) reset() {
 	t.children = newSparseChildList(t.maxPrefixPerNode)
 }
 
-var ErrNilPrefix = Drror("Nil prefix passed into a method call")
+var ErrNilPrefix = xrr.Xrror("Nil prefix passed into a method call")
 
 func (t *Trie) set(items ...Item) {
 	for _, i := range items {
@@ -507,7 +526,8 @@ func (t *Trie) findSubtreePath(prefix Prefix) (path []*Trie, found bool, leftove
 	}
 }
 
-var SkipSubtree = Drror("Skip this subtree")
+//
+var SkipSubtree = xrr.Xrror("Skip this subtree")
 
 func (t *Trie) walk(p Prefix, v VisitorFunc) error {
 	var prefix Prefix

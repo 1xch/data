@@ -1,6 +1,7 @@
 package data
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,9 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Laughs-In-Flowers/xrr"
 	yaml "gopkg.in/yaml.v2"
 )
 
+//
 type Store interface {
 	Read([]byte) (int, error)
 	In() (*Vector, error)
@@ -67,7 +70,7 @@ func (r *Retriever) RetrievalString() string {
 	return strings.Join(r.v, ":")
 }
 
-var MalformedRetrievalStringError = Drror("%s is malformed: %s").Out
+var MalformedRetrievalStringError = xrr.Xrror("%s is malformed: %s").Out
 
 func (s *store) Read(p []byte) (int, error) {
 	r, _, err := s.rfn(s.Retriever)
@@ -139,15 +142,17 @@ func (s Stores) Set(fs ...*StoreMaker) {
 	}
 }
 
-func GetStore(k string, r []string) Store {
+var UnavailableStoreError = xrr.Xrror("No store with key: %s").Out
+
+func GetStore(k string, r []string) (Store, error) {
 	return AvailableStores.Get(k, r)
 }
 
-func (s Stores) Get(k string, r []string) Store {
+func (s Stores) Get(k string, r []string) (Store, error) {
 	if f, ok := s[k]; ok {
-		return f.Fn(r)
+		return f.Fn(r), nil
 	}
-	return nil
+	return nil, UnavailableStoreError(k)
 }
 
 func init() {
@@ -155,13 +160,13 @@ func init() {
 	AvailableStores.Set(StdoutStore, YamlStore, JsonStore, JsonFStore)
 }
 
-var FunctionNotImplemented = Drror("%s function not implemented for the %s store.").Out
+var FunctionNotImplemented = xrr.Xrror("%s function not implemented for the %s store.").Out
 
-var StdoutStore = &StoreMaker{"STDOUT", OutStore(os.Stdout)}
+var StdoutStore = &StoreMaker{"stdout", OutStore(os.Stdout)}
 
 func OutStore(out *os.File) StoreFn {
 	return func([]string) Store {
-		rs := []string{"default", "STDOUT"}
+		rs := []string{"default", "stdout"}
 		return NewStore(
 			func(rt *Retriever) (io.ReadCloser, int64, error) {
 				return nil, 0, FunctionNotImplemented("Read Function", "STDOUT")
@@ -174,8 +179,10 @@ func OutStore(out *os.File) StoreFn {
 				if err != nil {
 					return nil, err
 				}
-				_, err = w.Write(b)
-				w.Close()
+				bb := new(bytes.Buffer)
+				bb.Write(b)
+				bb.WriteString("\n")
+				_, err = w.Write(bb.Bytes())
 				return rs, err
 			},
 			func(c *Vector) (io.WriteCloser, error) {
@@ -218,6 +225,41 @@ func yamlStore(rs []string) Store {
 		rs...,
 	)
 }
+
+/*
+var TomlStore = &StoreMaker{"toml", tomlStore}
+
+func tomlStore(rs []string) Store {
+	return NewStore(
+		readCloserFrom("yaml"),
+		func(r string, n int64, rr io.ReadCloser) (*Vector, error) {
+			c := New("")
+			b := make([]byte, n)
+			_, err := rr.Read(b)
+			if err != nil {
+				return nil, err
+			}
+			err = yaml.Unmarshal(b[:n], &c)
+			if err != nil {
+				return nil, err
+			}
+			return c, nil
+		},
+		func(c *Vector, w io.WriteCloser) ([]string, error) {
+			retrieval := c.ToStrings("store.retrieval.string")
+			y, err := yaml.Marshal(&c)
+			if err != nil {
+				return nil, err
+			}
+			_, err = w.Write(y)
+			w.Close()
+			return retrieval, err
+		},
+		writeCloserFrom("yaml"),
+		rs...,
+	)
+}
+*/
 
 var (
 	JsonStore  = &StoreMaker{"json", JsonStorer(regular)}
@@ -291,7 +333,7 @@ func writeCloserFrom(ext string) WriteFunc {
 	}
 }
 
-var ReaderRetrievalError = Drror("unable to find readcloser: %s").Out
+var ReaderRetrievalError = xrr.Xrror("unable to find readcloser: %s").Out
 
 func readCloserFrom(ext string) ReadFunc {
 	return func(rt *Retriever) (io.ReadCloser, int64, error) {
@@ -328,7 +370,7 @@ func readCloserFrom(ext string) ReadFunc {
 	}
 }
 
-var openError = Drror("unable to find or open file %s, provided %s").Out
+var openError = xrr.Xrror("unable to find or open file %s, provided %s").Out
 
 func Exist(path string) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {

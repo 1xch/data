@@ -1,0 +1,4 @@
+- finetune stdout store type
+- explore adding TOML store
+- explore other custom store types
+- memory use & speed investigation

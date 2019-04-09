@@ -92,24 +92,6 @@ func TestStringsItem(t *testing.T) {
 	}
 }
 
-func TestStringsListItem(t *testing.T) {
-	//i, ok := ssi.(StringsItem)
-	//if !ok {
-	//	t.Errorf("item is not StringsItem %v", ssi)
-	//}
-	//if ok {
-	//	vl1 := i.ToStrings()
-	//	if len(vl1) != 3 || vl1[2] != "c" {
-	//		t.Errorf("strings item is not ['a', 'b', 'c'], it is %v", vl1)
-	//	}
-	//	i.SetStrings("one", "two", "three", "four")
-	//	vl2 := i.ToStrings()
-	//	if len(vl2) != 4 || vl2[3] != "four" {
-	//		t.Errorf("strings item is not ['one', 'two', 'three', 'four'], it is %v", vl2)
-	//	}
-	//}
-}
-
 func TestBoolItem(t *testing.T) {
 	i, ok := bi.(BoolItem)
 	if !ok {
@@ -143,17 +125,65 @@ func TestIntItem(t *testing.T) {
 	}
 }
 
-func TestFloatItem(t *testing.T) {
-	i, ok := fi.(FloatItem)
+func TestInt64Item(t *testing.T) {
+	i, ok := ii64.(Int64Item)
+	if !ok {
+		t.Errorf("item is not Int64Item %v", ii64)
+	}
+	if ok {
+		if v1 := i.ToInt64(); v1 != 999 {
+			t.Errorf("int64 item value is not '999', it is %v", v1)
+		}
+		i.SetInt64(100)
+		if v2 := i.ToInt64(); v2 != 100 {
+			t.Errorf("int64 item value is not '100', it is %v", v2)
+		}
+	}
+}
+
+func TestUintItem(t *testing.T) {
+	i, ok := ui.(UintItem)
+	if !ok {
+		t.Errorf("item is not UintItem %v", ui)
+	}
+	if ok {
+		if v1 := i.ToUint(); v1 != 1 {
+			t.Errorf("uint item value is not '1', it is %v", v1)
+		}
+		i.SetUint(100)
+		if v2 := i.ToUint(); v2 != 100 {
+			t.Errorf("uint item value is not '100', it is %v", v2)
+		}
+	}
+}
+
+func TestUint64Item(t *testing.T) {
+	i, ok := ui64.(Uint64Item)
+	if !ok {
+		t.Errorf("item is not Uint64Item %v", ui64)
+	}
+	if ok {
+		if v1 := i.ToUint64(); v1 != 111 {
+			t.Errorf("uint64 item value is not '111', it is %v", v1)
+		}
+		i.SetUint64(100)
+		if v2 := i.ToUint64(); v2 != 100 {
+			t.Errorf("int item value is not '100', it is %v", v2)
+		}
+	}
+}
+
+func TestFloat64Item(t *testing.T) {
+	i, ok := fi.(Float64Item)
 	if !ok {
 		t.Errorf("item is not FloatItem %v", fi)
 	}
 	if ok {
-		if v1 := i.ToFloat(); v1 != 9.9 {
+		if v1 := i.ToFloat64(); v1 != 9.9 {
 			t.Errorf("float item is not 9.9, it is %v", v1)
 		}
 		i.SetFloat(9.8)
-		if v2 := i.ToFloat(); v2 != 9.8 {
+		if v2 := i.ToFloat64(); v2 != 9.8 {
 			t.Errorf("float item is not 9.8, it is %v", v2)
 		}
 	}
@@ -172,7 +202,7 @@ func TestVectorItem(t *testing.T) {
 		}
 		ci := v1.ToString("vector.1")
 		if ci != "ONE" {
-			t.Error("multi item container item is not 'ONE': %s", ci)
+			t.Errorf("multi item container item is not 'ONE': %s", ci)
 		}
 	}
 }

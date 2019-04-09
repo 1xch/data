@@ -8,11 +8,11 @@ import (
 func TestStore(t *testing.T) {
 	c1 := base
 	rs := c1.ToStrings("store.retrieval.string")
-	s1 := GetStore(rs[0], rs)
+	s1, _ := GetStore(rs[0], rs)
 	s1.Swap(c1)
 	s1.Out()
 
-	s2 := GetStore("yaml", rs)
+	s2, _ := GetStore("yaml", rs)
 	s2.Swap(c1)
 	s2.Out()
 
@@ -47,7 +47,7 @@ func storeTest(t *testing.T, trs []string, removal string, fn ...storeTestFunc) 
 		NewStringsItem("store.retrieval.string", trs...),
 	)
 	crs := c.ToStrings("store.retrieval.string")
-	s := GetStore(crs[0], crs)
+	s, _ := GetStore(crs[0], crs)
 
 	for _, f := range fn {
 		f(t, s, c)
@@ -168,7 +168,7 @@ func TestCustomStore(t *testing.T) {
 		"CUSTOM", customStore,
 	}
 	SetStore(mk)
-	s := GetStore("CUSTOM", []string{"custom", "string"})
+	s, _ := GetStore("CUSTOM", []string{"custom", "string"})
 
 	if n, err := s.Read([]byte{}); n != 7 || err != nil {
 		t.Errorf("custom store read value is not 7: it is %d with error %s", n, err.Error())
